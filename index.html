@@ -47,13 +47,19 @@
             stroke: #34d399;
             stroke-width: 3px;
         }
+
+        /* --- NEW: Disable default browser pinch-zoom on the SVG --- */
+        #visualization svg {
+            touch-action: none;
+        }
+
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-4 md:p-8">
 
     <div class="w-full max-w-6xl mx-auto">
         <h1 class="text-3xl md:text-4xl font-bold text-center mb-2 text-white">Artist Embedding Visualization</h1>
-        <p class="text-center text-gray-400 mb-8">Scroll to zoom and drag to pan the plot. Hover for details. Click to play.</p>
+        <p class="text-center text-gray-400 mb-8">Scroll/pinch to zoom and drag to pan the plot. Hover for details. Click to play.</p>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="relative w-full h-[500px] bg-gray-800 rounded-lg shadow-lg col-span-1 lg:col-span-2">
@@ -1507,7 +1513,7 @@
         g.append("text").attr("text-anchor", "end").attr("x", width / 2 + margin.left / 2).attr("y", height + margin.top).attr("fill", "#9ca3af").text("Embedding Dimension 1");
         g.append("text").attr("text-anchor", "end").attr("transform", "rotate(-90)").attr("y", -margin.left + 20).attr("x", -height / 2 + margin.top).attr("fill", "#9ca3af").text("Embedding Dimension 2");
 
-        // NEW: Add a clipPath to prevent dots from drawing outside the plot area
+        // Add a clipPath to prevent dots from drawing outside the plot area
         const clip = svg.append("defs").append("clipPath")
             .attr("id", "clip")
             .append("rect")
@@ -1536,76 +1542,71 @@
             .style("stroke-width", 0)
             .style("cursor", "pointer");
 
-        // --- NEW: Zoom functionality ---
-        // The zoom callback function
+        // --- Zoom functionality ---
         function zoomed(event) {
             const newTransform = event.transform;
-            // Rescale the original scales
             const newXScale = newTransform.rescaleX(xScale);
             const newYScale = newTransform.rescaleY(yScale);
-
-            // Update axes
             xAxisG.call(d3.axisBottom(newXScale));
             yAxisG.call(d3.axisLeft(newYScale));
-
-            // Update dot positions
             dots.attr('cx', d => newXScale(d.x))
                 .attr('cy', d => newYScale(d.y));
         }
 
-        // Create the zoom behavior
         const zoom = d3.zoom()
-            .scaleExtent([0.5, 20]) // Min 0.5x zoom, max 20x zoom
+            .scaleExtent([0.5, 20])
             .extent([[0, 0], [width, height]])
             .on("zoom", zoomed);
 
-        // Attach the zoom behavior to the SVG. This captures zoom/pan events.
         svg.call(zoom);
 
-        // --- NEW: Reset Zoom Button Logic ---
+        // --- Reset Zoom Button Logic ---
         d3.select("#reset-zoom-btn").on('click', () => {
              svg.transition().duration(750).call(
                 zoom.transform,
-                d3.zoomIdentity, // Resets to original scale and position
+                d3.zoomIdentity,
                 d3.zoomTransform(svg.node()).invert([width / 2, height / 2])
             );
         });
 
-        function updateInterestingList() { /* ... (no changes needed here) ... */
+        // --- Interaction and UI Update Functions (no changes here) ---
+        function updateInterestingList() {
             const list = d3.select("#interesting-points-list"); list.html('');
             if (interestingPoints.size === 0) { list.append('li').attr('id', 'interesting-list-placeholder').attr('class', 'text-gray-400').text('Marked points will appear here.'); return; }
             interestingPoints.forEach((d, id) => {
                 const item = list.append('li').attr('class', 'flex justify-between items-center p-2 rounded-md hover:bg-gray-700');
-                item.append('span').attr('class', 'cursor-pointer').text(d.title + ' (' + d.play_info + ')').on('click', () => { showPointDetails(d); dots.style('opacity', 0.6); d3.select(`#dot-${d.id}`).style('opacity', 1); });
+                item.append('span').attr('class', 'cursor-pointer').text(d.title + ' (' + d.play_info + ')' ).on('click', () => { showPointDetails(d); dots.style('opacity', 0.6); d3.select(`#dot-${d.id}`).style('opacity', 1); });
                 item.append('button').attr('class', 'text-red-400 hover:text-red-300 font-bold text-xl px-2').html('&times;').on('click', (event) => { event.stopPropagation(); toggleMark(d); });
             });
         }
-        function toggleMark(d) { /* ... (no changes needed here) ... */
+        function toggleMark(d) {
             if (interestingPoints.has(d.id)) { interestingPoints.delete(d.id); } else { interestingPoints.set(d.id, d); }
             saveInterestingPoints();
             dots.classed('marked', dataPoint => interestingPoints.has(dataPoint.id));
             updateInterestingList();
             showPointDetails(d);
         }
-        function showPointDetails(d) { /* ... (no changes needed here) ... */
+        function showPointDetails(d) {
             document.getElementById('info-placeholder').style.display = 'none';
             const playerWrapper = document.getElementById('player-wrapper');
             const isMarked = interestingPoints.has(d.id);
             playerWrapper.innerHTML = `<h3 class="text-xl font-bold mb-2 text-white">${d.title}</h3><p class="text-gray-400 mb-4">${d.content}</p><audio controls autoplay class="w-full rounded-lg"><source src="${d.sound}" type="audio/mpeg"></audio><div class="flex space-x-4 mt-4"><a href="${d.soundcloud}" target="_blank" class="flex-1 text-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors">SoundCloud</a><button id="mark-button" class="flex-1 px-4 py-2 rounded-lg transition-colors ${isMarked ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}">${isMarked ? 'Un-mark' : 'Mark as Interesting'}</button></div>`;
             document.getElementById('mark-button').addEventListener('click', () => toggleMark(d));
         }
-        dots.on("mouseover", function(event, d) { /* ... (no changes needed here) ... */
+        dots.on("mouseover", function(event, d) {
             d3.select(this).transition().duration(150).attr("r", 12).style("stroke-width", d3.select(this).classed('marked') ? 3 : 2);
             tooltip.transition().duration(200).style("opacity", .95);
             tooltip.html(`<b>${d.title}</b><br/>${d.content}`).style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
-        }).on("mouseout", function(d) { /* ... (no changes needed here) ... */
+        }).on("mouseout", function(d) {
             d3.select(this).transition().duration(150).attr("r", 8).style("stroke-width", d3.select(this).classed('marked') ? 3 : 0);
             tooltip.transition().duration(500).style("opacity", 0);
-        }).on("click", function(event, d) { /* ... (no changes needed here) ... */
+        }).on("click", function(event, d) {
             dots.style('opacity', 0.6);
             d3.select(this).style('opacity', 1);
             showPointDetails(d);
         });
+
+        // --- Initial Render ---
         dots.classed('marked', d => interestingPoints.has(d.id));
         updateInterestingList();
 
