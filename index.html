@@ -47,7 +47,11 @@
             fill: #1f2937;
         }
         .dot {
-            transition: r 0.2s ease-in-out, stroke-width 0.2s ease-in-out;
+            transition: r 0.2s ease-in-out, stroke-width 0.2s ease-in-out, stroke 0.2s ease-in-out;
+        }
+        .dot.marked {
+            stroke: #34d399; /* A bright green to indicate selection */
+            stroke-width: 3px;
         }
     </style>
 </head>
@@ -55,7 +59,7 @@
 
     <div class="w-full max-w-6xl mx-auto">
         <h1 class="text-3xl md:text-4xl font-bold text-center mb-2 text-white">Artist Embedding Visualization</h1>
-        <p class="text-center text-gray-400 mb-8">Hover over a point to see details. Click a point to load the audio.</p>
+        <p class="text-center text-gray-400 mb-8">Hover over a point to see details. Click a point to load the audio and mark it.</p>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Scatterplot Container -->
@@ -72,14 +76,21 @@
                 <div id="player-wrapper" class="w-full"></div>
             </div>
         </div>
+
+        <!-- Interesting Points List -->
+        <div id="interesting-points-container" class="w-full mt-8 bg-gray-800 rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold mb-4 text-white">Interesting Points</h2>
+            <ul id="interesting-points-list" class="space-y-2">
+                <li id="interesting-list-placeholder" class="text-gray-400">Marked points will appear here.</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Tooltip -->
     <div id="tooltip" class="tooltip"></div>
 
     <script>
-        // --- 1. Data Injection ---
-        // The Python script injects the JSON data here.
+        // --- 1. Data and State ---
         const dataset = [
     {
         "cluster": 3,
@@ -1322,6 +1333,31 @@
         "soundcloud": "https://soundcloud.com/zelevch/tracks"
     }
 ];
+        let interestingPoints = new Map(); // Use a Map to store marked points by ID for easy lookup
+
+        // --- Persistence Functions ---
+        function saveInterestingPoints() {
+            // localStorage can't store a Map directly, so convert it to an array of [key, value] pairs
+            const pointsArray = Array.from(interestingPoints.entries());
+            localStorage.setItem('artist-embedding-interesting-points', JSON.stringify(pointsArray));
+        }
+
+        function loadInterestingPoints() {
+            const storedPoints = localStorage.getItem('artist-embedding-interesting-points');
+            if (storedPoints) {
+                try {
+                    // If data exists, parse it and create a new Map from the array
+                    const pointsArray = JSON.parse(storedPoints);
+                    interestingPoints = new Map(pointsArray);
+                } catch (e) {
+                    console.error("Could not parse interesting points from localStorage", e);
+                    interestingPoints = new Map();
+                }
+            }
+        }
+
+        // Load saved points on page startup
+        loadInterestingPoints();
 
         // --- 2. D3.js Visualization Setup ---
         const margin = { 'top': 40, 'right': 30, 'bottom': 50, 'left': 60 };
@@ -1337,68 +1373,33 @@
             .append("g")
             .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-        // Add a background rectangle
-        svg.append("rect")
-            .attr("width", width)
-            .attr("height", height)
-            .attr("class", "plot-bg");
+        svg.append("rect").attr("width", width).attr("height", height).attr("class", "plot-bg");
 
-        // --- Scales ---
-        // Automatically determine the domain based on the data, with padding
         const xExtent = d3.extent(dataset, d => d.x);
         const yExtent = d3.extent(dataset, d => d.y);
-        const xPadding = (xExtent[1] - xExtent[0]) * 0.1 || 10; // Add padding, with a fallback for single points
+        const xPadding = (xExtent[1] - xExtent[0]) * 0.1 || 10;
         const yPadding = (yExtent[1] - yExtent[0]) * 0.1 || 10;
 
-        const xScale = d3.scaleLinear()
-            .domain([xExtent[0] - xPadding, xExtent[1] + xPadding])
-            .range([0, width]);
+        const xScale = d3.scaleLinear().domain([xExtent[0] - xPadding, xExtent[1] + xPadding]).range([0, width]);
+        const yScale = d3.scaleLinear().domain([yExtent[0] - yPadding, yExtent[1] + yPadding]).range([height, 0]);
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(d3.map(dataset, d => d.cluster));
 
-        const yScale = d3.scaleLinear()
-            .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
-            .range([height, 0]);
-
-        const colorScale = d3.scaleOrdinal(d3.schemeCategory10)
-            .domain(d3.map(dataset, d => d.cluster));
-
-        // --- Axes ---
         const xAxis = d3.axisBottom(xScale);
-        svg.append("g")
-            .attr("transform", `translate(0, ${height})`)
-            .attr("class", "axis")
-            .call(xAxis);
-
         const yAxis = d3.axisLeft(yScale);
-        svg.append("g")
-            .attr("class", "axis")
-            .call(yAxis);
+        svg.append("g").attr("transform", `translate(0, ${height})`).attr("class", "axis").call(xAxis);
+        svg.append("g").attr("class", "axis").call(yAxis);
 
-        // Axis labels
-        svg.append("text")
-            .attr("text-anchor", "end")
-            .attr("x", width / 2 + margin.left / 2)
-            .attr("y", height + margin.top)
-            .attr("fill", "#9ca3af")
-            .text("Embedding Dimension 1");
+        svg.append("text").attr("text-anchor", "end").attr("x", width / 2 + margin.left / 2).attr("y", height + margin.top).attr("fill", "#9ca3af").text("Embedding Dimension 1");
+        svg.append("text").attr("text-anchor", "end").attr("transform", "rotate(-90)").attr("y", -margin.left + 20).attr("x", -height / 2 + margin.top).attr("fill", "#9ca3af").text("Embedding Dimension 2");
 
-        svg.append("text")
-            .attr("text-anchor", "end")
-            .attr("transform", "rotate(-90)")
-            .attr("y", -margin.left + 20)
-            .attr("x", -height / 2 + margin.top)
-            .attr("fill", "#9ca3af")
-            .text("Embedding Dimension 2");
-
-
-        // --- Tooltip ---
         const tooltip = d3.select("#tooltip");
 
-        // --- Create Points ---
         const dots = svg.selectAll(".dot")
-            .data(dataset)
+            .data(dataset, d => d.id) // Use a key function for object constancy
             .enter()
             .append("circle")
             .attr("class", "dot")
+            .attr("id", d => `dot-${d.id}`)
             .attr("cx", d => xScale(d.x))
             .attr("cy", d => yScale(d.y))
             .attr("r", 8)
@@ -1407,41 +1408,62 @@
             .style("stroke-width", 0)
             .style("cursor", "pointer");
 
-        // --- 3. Interaction Handlers ---
-        dots.on("mouseover", function(event, d) {
-            d3.select(this)
-                .transition()
-                .duration(150)
-                .attr("r", 12)
-                .style("stroke-width", 2);
+        // --- 3. Interaction and UI Update Functions ---
 
-            tooltip.transition().duration(200).style("opacity", .95);
-            tooltip.html(`
-                <div class="font-bold text-white">${d.title}</div>
-                <div class="text-gray-300">${d.content}</div>
-                <a href="${d.soundcloud}" target="_blank">Listen on SoundCloud</a>
-            `)
-            .style("left", (event.pageX + 15) + "px")
-            .style("top", (event.pageY - 28) + "px");
-        })
-        .on("mouseout", function(d) {
-            d3.select(this)
-                .transition()
-                .duration(150)
-                .attr("r", 8)
-                .style("stroke-width", 0);
+        function updateInterestingList() {
+            const list = d3.select("#interesting-points-list");
+            list.html(''); // Clear the list
 
-            tooltip.transition().duration(500).style("opacity", 0);
-        })
-        .on("click", function(event, d) {
-            // Highlight the clicked dot
-            dots.style('opacity', 0.5);
-            d3.select(this).style('opacity', 1);
+            if (interestingPoints.size === 0) {
+                list.append('li').attr('id', 'interesting-list-placeholder').attr('class', 'text-gray-400').text('Marked points will appear here.');
+                return;
+            }
 
-            // Hide placeholder text
+            interestingPoints.forEach((d, id) => {
+                const item = list.append('li')
+                    .attr('class', 'flex justify-between items-center p-2 rounded-md hover:bg-gray-700');
+
+                item.append('span')
+                    .attr('class', 'cursor-pointer')
+                    .text(d.title)
+                    .on('click', () => {
+                        showPointDetails(d);
+                        // Also highlight the dot on the plot
+                        dots.style('opacity', 0.6);
+                        d3.select(`#dot-${d.id}`).style('opacity', 1);
+                    });
+
+                item.append('button')
+                    .attr('class', 'text-red-400 hover:text-red-300 font-bold text-xl px-2')
+                    .html('&times;') // The 'x' character for removal
+                    .on('click', (event) => {
+                        event.stopPropagation(); // Prevent the li click event from firing
+                        toggleMark(d);
+                    });
+            });
+        }
+
+        function toggleMark(d) {
+            if (interestingPoints.has(d.id)) {
+                interestingPoints.delete(d.id);
+            } else {
+                interestingPoints.set(d.id, d);
+            }
+            saveInterestingPoints(); // Save changes to localStorage
+
+            // Update the visual state of all dots
+            dots.classed('marked', dataPoint => interestingPoints.has(dataPoint.id));
+
+            // Re-render the list and update the sidebar button
+            updateInterestingList();
+            showPointDetails(d);
+        }
+
+        function showPointDetails(d) {
             document.getElementById('info-placeholder').style.display = 'none';
-
             const playerWrapper = document.getElementById('player-wrapper');
+            const isMarked = interestingPoints.has(d.id);
+
             playerWrapper.innerHTML = `
                 <h3 class="text-xl font-bold mb-2 text-white">${d.title}</h3>
                 <p class="text-gray-400 mb-4">${d.content}</p>
@@ -1449,48 +1471,62 @@
                     <source src="${d.sound}" type="audio/mpeg">
                     Your browser does not support the audio element.
                 </audio>
-                <a href="${d.soundcloud}" target="_blank" class="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    View on SoundCloud
-                </a>
+                <div class="flex space-x-4 mt-4">
+                    <a href="${d.soundcloud}" target="_blank" class="flex-1 text-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors">
+                        SoundCloud
+                    </a>
+                    <button id="mark-button" class="flex-1 px-4 py-2 rounded-lg transition-colors ${isMarked ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}">
+                        ${isMarked ? 'Un-mark' : 'Mark as Interesting'}
+                    </button>
+                </div>
             `;
+
+            document.getElementById('mark-button').addEventListener('click', () => toggleMark(d));
+        }
+
+        dots.on("mouseover", function(event, d) {
+            d3.select(this)
+                .transition().duration(150)
+                .attr("r", 12)
+                .style("stroke-width", d3.select(this).classed('marked') ? 3 : 2);
+
+            tooltip.transition().duration(200).style("opacity", .95);
+            tooltip.html(`<b>${d.title}</b><br/>${d.content}`).style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function(d) {
+            d3.select(this)
+                .transition().duration(150)
+                .attr("r", 8)
+                .style("stroke-width", d3.select(this).classed('marked') ? 3 : 0);
+
+            tooltip.transition().duration(500).style("opacity", 0);
+        })
+        .on("click", function(event, d) {
+            dots.style('opacity', 0.6);
+            d3.select(this).style('opacity', 1);
+            showPointDetails(d);
         });
 
-        // Responsive chart
+        // --- Initial Render on Load ---
+        dots.classed('marked', d => interestingPoints.has(d.id));
+        updateInterestingList();
+
         function resize() {
             width = container.clientWidth - margin.left - margin.right;
             height = container.clientHeight - margin.top - margin.bottom;
-
-            // Update SVG viewBox
-            d3.select(container.querySelector('svg'))
-                .attr('viewBox', `0 0 ${container.clientWidth} ${container.clientHeight}`);
-
-            // Update scales
+            d3.select(container.querySelector('svg')).attr('viewBox', `0 0 ${container.clientWidth} ${container.clientHeight}`);
             xScale.range([0, width]);
             yScale.range([height, 0]);
-
-            // Update background
-            svg.select(".plot-bg")
-                .attr("width", width)
-                .attr("height", height);
-
-            // Update axes
-            svg.select(".axis:nth-of-type(1)").call(xAxis);
-            svg.select(".axis:nth-of-type(2)").call(yAxis);
-            svg.select("g:nth-of-type(3)").attr("transform", `translate(0, ${height})`).call(xAxis);
-            svg.select("g:nth-of-type(4)").call(yAxis);
-
-            // Update axis labels
+            svg.select(".plot-bg").attr("width", width).attr("height", height);
+            svg.select("g.axis:nth-of-type(1)").call(xAxis);
+            svg.select("g.axis:nth-of-type(2)").call(yAxis);
+            svg.select("g.axis:nth-of-type(3)").attr("transform", `translate(0, ${height})`).call(xAxis);
+            svg.select("g.axis:nth-of-type(4)").call(yAxis);
             svg.select("text:nth-of-type(1)").attr("x", width / 2 + margin.left / 2).attr("y", height + margin.top);
             svg.select("text:nth-of-type(2)").attr("y", -margin.left + 20).attr("x", -height / 2 + margin.top);
-
-
-            // Update dots
-            dots.attr("cx", d => xScale(d.x))
-                .attr("cy", d => yScale(d.y));
+            dots.attr("cx", d => xScale(d.x)).attr("cy", d => yScale(d.y));
         }
-
         window.addEventListener('resize', resize);
-
     </script>
 </body>
 </html>
