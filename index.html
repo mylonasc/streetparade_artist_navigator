@@ -1,0 +1,1497 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Artist Embedding Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #f3f4f6;
+        }
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            background: #1f2937;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .tooltip a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+        .tooltip a:hover {
+            text-decoration: underline;
+        }
+        .axis path,
+        .axis line {
+            stroke: #4b5563;
+        }
+        .axis text {
+            fill: #9ca3af;
+        }
+        .plot-bg {
+            fill: #1f2937;
+        }
+        .dot {
+            transition: r 0.2s ease-in-out, stroke-width 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 md:p-8">
+
+    <div class="w-full max-w-6xl mx-auto">
+        <h1 class="text-3xl md:text-4xl font-bold text-center mb-2 text-white">Artist Embedding Visualization</h1>
+        <p class="text-center text-gray-400 mb-8">Hover over a point to see details. Click a point to load the audio.</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Scatterplot Container -->
+            <div id="visualization" class="w-full h-[500px] bg-gray-800 rounded-lg shadow-lg col-span-1 lg:col-span-2"></div>
+
+            <!-- Sound Player and Info Container -->
+            <div id="audio-container" class="w-full flex flex-col items-center justify-center bg-gray-800 rounded-lg p-6 shadow-lg h-[500px]">
+                 <div id="info-placeholder" class="text-center text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.636 5.636a9 9 0 0112.728 0M8.464 15.536a5 5 0 010-7.072" />
+                    </svg>
+                    <p class="mt-4">Click a point on the scatterplot to play a sound snippet.</p>
+                </div>
+                <div id="player-wrapper" class="w-full"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        // --- 1. Data Injection ---
+        // The Python script injects the JSON data here.
+        const dataset = [
+    {
+        "cluster": 2,
+        "x": 53.04543924331665,
+        "y": 49.095717668533325,
+        "title": "7ubo",
+        "id": "7ubo",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.87347459793091,
+        "y": 52.87031006813049,
+        "title": "AANN x ANCHI \u2022 Style am Rhein (SH)",
+        "id": "AANN x ANCHI \u2022 Style am Rhein (SH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 41.29021167755127,
+        "y": 52.454779386520386,
+        "title": "Aaron Khaleian",
+        "id": "Aaron Khaleian",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 44.075119495391846,
+        "y": 54.825714111328125,
+        "title": "Acid Flora",
+        "id": "Acid Flora",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 44.169105052948,
+        "y": 54.82799243927002,
+        "title": "ACID TRAINER \u2022 Hive (ZH)",
+        "id": "ACID TRAINER \u2022 Hive (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 44.576008796691895,
+        "y": 51.69371747970581,
+        "title": "Alanor",
+        "id": "Alanor",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 51.24586725234985,
+        "y": 51.753602385520935,
+        "title": "Alex Clyde",
+        "id": "Alex Clyde",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 46.218499422073364,
+        "y": 54.50761365890503,
+        "title": "Alex Morales",
+        "id": "Alex Morales",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 40.87652397155762,
+        "y": 55.36702871322632,
+        "title": "Aline \u2022 Grocery (ZH)",
+        "id": "Aline \u2022 Grocery (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 43.00389814376831,
+        "y": 52.72417950630188,
+        "title": "Angie Taylor",
+        "id": "Angie Taylor",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 46.51338052749634,
+        "y": 49.76233492791653,
+        "title": "Animal Trainer",
+        "id": "Animal Trainer",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 49.422728300094604,
+        "y": 45.04938077926636,
+        "title": "AshrA",
+        "id": "AshrA",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 49.07337832450867,
+        "y": 50.598850786685944,
+        "title": "Black Circle",
+        "id": "Black Circle",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 51.771167397499084,
+        "y": 46.533806800842285,
+        "title": "Black Spirit",
+        "id": "Black Spirit",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 48.7857723236084,
+        "y": 48.501638889312744,
+        "title": "Bodo Kaiser",
+        "id": "Bodo Kaiser",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 43.449138164520264,
+        "y": 50.38134163618088,
+        "title": "Carol Fernandez",
+        "id": "Carol Fernandez",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 49.773245483636856,
+        "y": 42.1965446472168,
+        "title": "Cassie Raptor",
+        "id": "Cassie Raptor",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 50.599688947200775,
+        "y": 44.048551082611084,
+        "title": "Centaury",
+        "id": "Centaury",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 45.77390193939209,
+        "y": 53.323994874954224,
+        "title": "Chris.P",
+        "id": "Chris.P",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 47.57147264480591,
+        "y": 44.693721771240234,
+        "title": "civic3mille",
+        "id": "civic3mille",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 45.80899143218994,
+        "y": 45.6136155128479,
+        "title": "Code Red",
+        "id": "Code Red",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 46.98076152801514,
+        "y": 46.0544593334198,
+        "title": "Collective Dream",
+        "id": "Collective Dream",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 40.4937801361084,
+        "y": 53.867939710617065,
+        "title": "Cora M",
+        "id": "Cora M",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 47.08258843421936,
+        "y": 50.4041953086853,
+        "title": "Dangel Twins",
+        "id": "Dangel Twins",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 41.59621620178223,
+        "y": 52.30196475982666,
+        "title": "Dani Posada x Ruben Coslada",
+        "id": "Dani Posada x Ruben Coslada",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.27566719055176,
+        "y": 51.52018344402313,
+        "title": "Dario Blum",
+        "id": "Dario Blum",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 52.06157732009888,
+        "y": 44.686190605163574,
+        "title": "Dark Headz",
+        "id": "Dark Headz",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 44.25546169281006,
+        "y": 50.385569870471954,
+        "title": "Darren",
+        "id": "Darren",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 44.17742347717285,
+        "y": 53.26469349861145,
+        "title": "Daughter in Law",
+        "id": "Daughter in Law",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 45.011106967926025,
+        "y": 51.119953989982605,
+        "title": "David Moreno",
+        "id": "David Moreno",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 53.35738801956177,
+        "y": 45.64512777328491,
+        "title": "Deadly Guns",
+        "id": "Deadly Guns",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 50.49537181854248,
+        "y": 48.88005268573761,
+        "title": "Dekerim",
+        "id": "Dekerim",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.41295623779297,
+        "y": 48.72973299026489,
+        "title": "De La Maso",
+        "id": "De La Maso",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 46.61386966705322,
+        "y": 46.04989457130432,
+        "title": "Der K\u00f6hler",
+        "id": "Der K\u00f6hler",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 49.26832890510559,
+        "y": 45.6426305770874,
+        "title": "DEVN6",
+        "id": "DEVN6",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 43.637760639190674,
+        "y": 54.3247184753418,
+        "title": "DJERRY C \u2022 D! Club Lausanne",
+        "id": "DJERRY C \u2022 D! Club Lausanne",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 48.05396068096161,
+        "y": 44.02752494812012,
+        "title": "Doma \u2022 Nordstern Basel",
+        "id": "Doma \u2022 Nordstern Basel",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 48.151206851005554,
+        "y": 53.86414051055908,
+        "title": "Dr. Motte",
+        "id": "Dr. Motte",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 46.71924185752869,
+        "y": 51.252506494522095,
+        "title": "Dream",
+        "id": "Dream",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 48.48555338382721,
+        "y": 42.688973903656006,
+        "title": "Edward Ean",
+        "id": "Edward Ean",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 51.97833299636841,
+        "y": 49.68873327970505,
+        "title": "EDX",
+        "id": "EDX",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 47.65620303153992,
+        "y": 46.27945518493652,
+        "title": "Effim",
+        "id": "Effim",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 51.47212767601013,
+        "y": 53.02528619766235,
+        "title": "Eric SSL",
+        "id": "Eric SSL",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 39.26552963256836,
+        "y": 50.570297598838806,
+        "title": "Erti Lutaj",
+        "id": "Erti Lutaj",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 39.06758975982666,
+        "y": 53.95000100135803,
+        "title": "FD x Basemanguy x Diflora x Badboy MC \u2022 Hotbox (ZH)",
+        "id": "FD x Basemanguy x Diflora x Badboy MC \u2022 Hotbox (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 52.39702844619751,
+        "y": 50.25536125898361,
+        "title": "FUNK D",
+        "id": "FUNK D",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 45.54111671447754,
+        "y": 45.95125961303711,
+        "title": "Hymetik",
+        "id": "Hymetik",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 47.93274712562561,
+        "y": 51.18324661254883,
+        "title": "H\u00f6hnflug",
+        "id": "H\u00f6hnflug",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 46.08376741409302,
+        "y": 46.72974991798401,
+        "title": "IBOR",
+        "id": "IBOR",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 41.92176628112793,
+        "y": 52.30998969078064,
+        "title": "Izio",
+        "id": "Izio",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 48.43901765346527,
+        "y": 54.39199733734131,
+        "title": "Jamira Estrada \u2022 CUADRO22 (GR)",
+        "id": "Jamira Estrada \u2022 CUADRO22 (GR)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 49.329429626464844,
+        "y": 42.29577827453613,
+        "title": "Jazzy b2b Jowi",
+        "id": "Jazzy b2b Jowi",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 40.958109855651855,
+        "y": 49.34595066308975,
+        "title": "Kellerkind x Anthik",
+        "id": "Kellerkind x Anthik",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 47.75921273231506,
+        "y": 48.25959372520447,
+        "title": "Khainz",
+        "id": "Khainz",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 50.294864028692245,
+        "y": 46.196979999542236,
+        "title": "KOS:MO",
+        "id": "KOS:MO",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 43.821781158447266,
+        "y": 46.568108558654785,
+        "title": "KSO12",
+        "id": "KSO12",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 48.825180411338806,
+        "y": 42.64637088775635,
+        "title": "K\u00d8ZL\u00d8V",
+        "id": "K\u00d8ZL\u00d8V",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 43.12996196746826,
+        "y": 51.35357415676117,
+        "title": "Lenny Lou",
+        "id": "Lenny Lou",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 47.165645122528076,
+        "y": 45.22163105010986,
+        "title": "M.I.K.E. Push",
+        "id": "M.I.K.E. Push",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 44.959569454193115,
+        "y": 51.54112005233765,
+        "title": "Marcus Meinhardt",
+        "id": "Marcus Meinhardt",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 45.17304754257202,
+        "y": 50.297546833753586,
+        "title": "Matija",
+        "id": "Matija",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 44.62514781951904,
+        "y": 45.729740142822266,
+        "title": "Megix x Galopp \u2022 Exil (ZH)",
+        "id": "Megix x Galopp \u2022 Exil (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 51.48044812679291,
+        "y": 50.36365416646004,
+        "title": "MIMMO",
+        "id": "MIMMO",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.83959627151489,
+        "y": 54.25066518783569,
+        "title": "Morgan Button x Luca Dario \u2022 Scharzmatt (SG)",
+        "id": "Morgan Button x Luca Dario \u2022 Scharzmatt (SG)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 52.96929383277893,
+        "y": 45.860822677612305,
+        "title": "Mr. Bassmeister",
+        "id": "Mr. Bassmeister",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 52.57891774177551,
+        "y": 46.21905159950256,
+        "title": "MTS & FR3AKMASTER \u2022 Ravefield (ZH)",
+        "id": "MTS & FR3AKMASTER \u2022 Ravefield (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.95978546142578,
+        "y": 51.22397601604462,
+        "title": "Mymocea x S.High-Ends",
+        "id": "Mymocea x S.High-Ends",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 46.49375367164612,
+        "y": 51.07846975326538,
+        "title": "Mytripismytrip",
+        "id": "Mytripismytrip",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 46.05326962471008,
+        "y": 45.32017707824707,
+        "title": "Nakadia",
+        "id": "Nakadia",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 48.70790386199951,
+        "y": 52.2796585559845,
+        "title": "Nick Schwenderling",
+        "id": "Nick Schwenderling",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 52.158687353134155,
+        "y": 45.281142234802246,
+        "title": "Nicolas Julian",
+        "id": "Nicolas Julian",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 51.01912498474121,
+        "y": 45.914329528808594,
+        "title": "Niels van Gogh",
+        "id": "Niels van Gogh",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 41.77834224700928,
+        "y": 53.13259243965149,
+        "title": "Niiomi",
+        "id": "Niiomi",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 45.65650463104248,
+        "y": 43.89410734176636,
+        "title": "No\u00e9e",
+        "id": "No\u00e9e",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 50.95987546443939,
+        "y": 48.257442355155945,
+        "title": "Omiki",
+        "id": "Omiki",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 47.36055588722229,
+        "y": 43.571476459503174,
+        "title": "ONX",
+        "id": "ONX",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 45.34682273864746,
+        "y": 55.18563413619995,
+        "title": "Pablo Beltran",
+        "id": "Pablo Beltran",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 44.9616003036499,
+        "y": 55.80906534194946,
+        "title": "Patrischa \u2022 Naturklang (ZH)",
+        "id": "Patrischa \u2022 Naturklang (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.89209461212158,
+        "y": 48.631927251815796,
+        "title": "Paul Stadtfuchs",
+        "id": "Paul Stadtfuchs",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 44.252206802368164,
+        "y": 46.03722167015076,
+        "title": "Pelin Vedis",
+        "id": "Pelin Vedis",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 52.76840901374817,
+        "y": 47.776249170303345,
+        "title": "Plastik Funk",
+        "id": "Plastik Funk",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 42.91408109664917,
+        "y": 55.63663578033447,
+        "title": "Playlove",
+        "id": "Playlove",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 47.73940348625183,
+        "y": 48.99263668060303,
+        "title": "Psykick Angel",
+        "id": "Psykick Angel",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 46.55463910102844,
+        "y": 44.27112150192261,
+        "title": "Psywhispering",
+        "id": "Psywhispering",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 40.81863307952881,
+        "y": 50.62596172094345,
+        "title": "Ra-Moon \u2022 Tech am See (ZG)",
+        "id": "Ra-Moon \u2022 Tech am See (ZG)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 50.996046006679535,
+        "y": 48.939714550971985,
+        "title": "RAFFI LUSSO",
+        "id": "RAFFI LUSSO",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 50.9275843501091,
+        "y": 45.0033073425293,
+        "title": "RAM",
+        "id": "RAM",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 49.98164484091103,
+        "y": 50.38016399741173,
+        "title": "Regard",
+        "id": "Regard",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 50.51233613491058,
+        "y": 51.12691903114319,
+        "title": "Reteez n'Burn",
+        "id": "Reteez n'Burn",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 50.757776618003845,
+        "y": 52.43789076805115,
+        "title": "Richard Durand",
+        "id": "Richard Durand",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 48.0959712266922,
+        "y": 45.853129386901855,
+        "title": "Rob",
+        "id": "Rob",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 51.955440402030945,
+        "y": 48.97175467014313,
+        "title": "Roda",
+        "id": "Roda",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 45.32943677902222,
+        "y": 54.8991813659668,
+        "title": "Rosanna",
+        "id": "Rosanna",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 51.3191784620285,
+        "y": 47.77093243598938,
+        "title": "Roum",
+        "id": "Roum",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 49.3099929690361,
+        "y": 44.72364282608032,
+        "title": "Rugrats",
+        "id": "Rugrats",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.576974868774414,
+        "y": 50.57658010721207,
+        "title": "Samarsi",
+        "id": "Samarsi",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 41.83831214904785,
+        "y": 51.39047360420227,
+        "title": "Samas x Whereisvero \u2022 Offshore (LU)",
+        "id": "Samas x Whereisvero \u2022 Offshore (LU)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 40.673550605773926,
+        "y": 53.030927658081055,
+        "title": "Sam Madi",
+        "id": "Sam Madi",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 39.21844673156738,
+        "y": 49.69103384017944,
+        "title": "Sam Rovisan & Evelyne Volta",
+        "id": "Sam Rovisan & Evelyne Volta",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 40.468008041381836,
+        "y": 52.363539695739746,
+        "title": "Samsara \u2022 Klaus Club (ZH)",
+        "id": "Samsara \u2022 Klaus Club (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 43.989049434661865,
+        "y": 56.59898614883423,
+        "title": "Savalfair",
+        "id": "Savalfair",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 43.05583572387695,
+        "y": 49.94387976080179,
+        "title": "Sebastian Konrad",
+        "id": "Sebastian Konrad",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 47.959956645965576,
+        "y": 45.92247772216797,
+        "title": "Simina Grigoriu",
+        "id": "Simina Grigoriu",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 40.59440040588379,
+        "y": 50.66319102048874,
+        "title": "Sojandri",
+        "id": "Sojandri",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 1,
+        "x": 50.005678792949766,
+        "y": 45.628318786621094,
+        "title": "Somewhen",
+        "id": "Somewhen",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 50.35161378979683,
+        "y": 47.26758432388306,
+        "title": "Super8 & Tab",
+        "id": "Super8 & Tab",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 46.73495078086853,
+        "y": 45.013408184051514,
+        "title": "Sylent",
+        "id": "Sylent",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 46.04381513595581,
+        "y": 48.106650948524475,
+        "title": "SYNERGEE",
+        "id": "SYNERGEE",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 45.17254590988159,
+        "y": 54.906938552856445,
+        "title": "Table For Two",
+        "id": "Table For Two",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 5,
+        "x": 48.630814909935,
+        "y": 52.59516000747681,
+        "title": "Tanner",
+        "id": "Tanner",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.08091163635254,
+        "y": 50.31385812163353,
+        "title": "Tekibo",
+        "id": "Tekibo",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 47.422430992126465,
+        "y": 47.62906312942505,
+        "title": "TH;EN",
+        "id": "TH;EN",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 50.37877377867699,
+        "y": 50.05593868345022,
+        "title": "Thomas Lizzarra",
+        "id": "Thomas Lizzarra",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 45.54548978805542,
+        "y": 53.50324535369873,
+        "title": "Thyora",
+        "id": "Thyora",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 42.12163734436035,
+        "y": 54.496891498565674,
+        "title": "Tino",
+        "id": "Tino",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 39.09358787536621,
+        "y": 52.2488899230957,
+        "title": "Tito Torres",
+        "id": "Tito Torres",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 45.96773719787598,
+        "y": 52.490169286727905,
+        "title": "TWENNY5 \u2022 Viertel Basel",
+        "id": "TWENNY5 \u2022 Viertel Basel",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 43.6900897026062,
+        "y": 52.71262049674988,
+        "title": "Two of a Kind",
+        "id": "Two of a Kind",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 43.588515281677246,
+        "y": 56.30978441238403,
+        "title": "Valentino \u2022 Frieda's B\u00fcxe (ZH)",
+        "id": "Valentino \u2022 Frieda's B\u00fcxe (ZH)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 4,
+        "x": 47.35033464431763,
+        "y": 47.49097967147827,
+        "title": "Vanita",
+        "id": "Vanita",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 3,
+        "x": 41.34481430053711,
+        "y": 54.14285659790039,
+        "title": "Xavi Emparan",
+        "id": "Xavi Emparan",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 2,
+        "x": 49.45088905096054,
+        "y": 49.97246163897216,
+        "title": "Yannick M\u00fcller",
+        "id": "Yannick M\u00fcller",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 46.79830884933472,
+        "y": 53.34772825241089,
+        "title": "Yuliana",
+        "id": "Yuliana",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    },
+    {
+        "cluster": 0,
+        "x": 43.07477617263794,
+        "y": 55.936646461486816,
+        "title": "Zelev \u2022 Kiosk (LU)",
+        "id": "Zelev \u2022 Kiosk (LU)",
+        "content": "TODO",
+        "sound": "todo",
+        "soundcloud": "todo"
+    }
+];
+
+        // --- 2. D3.js Visualization Setup ---
+        const margin = { 'top': 40, 'right': 30, 'bottom': 50, 'left': 60 };
+        const container = document.getElementById('visualization');
+        let width = container.clientWidth - margin.left - margin.right;
+        let height = container.clientHeight - margin.top - margin.bottom;
+
+        const svg = d3.select("#visualization")
+            .append("svg")
+            .attr("width", '100%')
+            .attr("height", '100%')
+            .attr('viewBox', `0 0 ${container.clientWidth} ${container.clientHeight}`)
+            .append("g")
+            .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+        // Add a background rectangle
+        svg.append("rect")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("class", "plot-bg");
+
+        // --- Scales ---
+        // Automatically determine the domain based on the data, with padding
+        const xExtent = d3.extent(dataset, d => d.x);
+        const yExtent = d3.extent(dataset, d => d.y);
+        const xPadding = (xExtent[1] - xExtent[0]) * 0.1 || 10; // Add padding, with a fallback for single points
+        const yPadding = (yExtent[1] - yExtent[0]) * 0.1 || 10;
+
+        const xScale = d3.scaleLinear()
+            .domain([xExtent[0] - xPadding, xExtent[1] + xPadding])
+            .range([0, width]);
+
+        const yScale = d3.scaleLinear()
+            .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
+            .range([height, 0]);
+
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10)
+            .domain(d3.map(dataset, d => d.cluster));
+
+        // --- Axes ---
+        const xAxis = d3.axisBottom(xScale);
+        svg.append("g")
+            .attr("transform", `translate(0, ${height})`)
+            .attr("class", "axis")
+            .call(xAxis);
+
+        const yAxis = d3.axisLeft(yScale);
+        svg.append("g")
+            .attr("class", "axis")
+            .call(yAxis);
+
+        // Axis labels
+        svg.append("text")
+            .attr("text-anchor", "end")
+            .attr("x", width / 2 + margin.left / 2)
+            .attr("y", height + margin.top)
+            .attr("fill", "#9ca3af")
+            .text("Embedding Dimension 1");
+
+        svg.append("text")
+            .attr("text-anchor", "end")
+            .attr("transform", "rotate(-90)")
+            .attr("y", -margin.left + 20)
+            .attr("x", -height / 2 + margin.top)
+            .attr("fill", "#9ca3af")
+            .text("Embedding Dimension 2");
+
+
+        // --- Tooltip ---
+        const tooltip = d3.select("#tooltip");
+
+        // --- Create Points ---
+        const dots = svg.selectAll(".dot")
+            .data(dataset)
+            .enter()
+            .append("circle")
+            .attr("class", "dot")
+            .attr("cx", d => xScale(d.x))
+            .attr("cy", d => yScale(d.y))
+            .attr("r", 8)
+            .style("fill", d => colorScale(d.cluster))
+            .style("stroke", "#f3f4f6")
+            .style("stroke-width", 0)
+            .style("cursor", "pointer");
+
+        // --- 3. Interaction Handlers ---
+        dots.on("mouseover", function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .attr("r", 12)
+                .style("stroke-width", 2);
+
+            tooltip.transition().duration(200).style("opacity", .95);
+            tooltip.html(`
+                <div class="font-bold text-white">${d.title}</div>
+                <div class="text-gray-300">${d.content}</div>
+                <a href="${d.soundcloud}" target="_blank">Listen on SoundCloud</a>
+            `)
+            .style("left", (event.pageX + 15) + "px")
+            .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function(d) {
+            d3.select(this)
+                .transition()
+                .duration(150)
+                .attr("r", 8)
+                .style("stroke-width", 0);
+
+            tooltip.transition().duration(500).style("opacity", 0);
+        })
+        .on("click", function(event, d) {
+            // Highlight the clicked dot
+            dots.style('opacity', 0.5);
+            d3.select(this).style('opacity', 1);
+
+            // Hide placeholder text
+            document.getElementById('info-placeholder').style.display = 'none';
+
+            const playerWrapper = document.getElementById('player-wrapper');
+            playerWrapper.innerHTML = `
+                <h3 class="text-xl font-bold mb-2 text-white">${d.title}</h3>
+                <p class="text-gray-400 mb-4">${d.content}</p>
+                <audio controls autoplay class="w-full rounded-lg">
+                    <source src="${d.sound}" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <a href="${d.soundcloud}" target="_blank" class="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    View on SoundCloud
+                </a>
+            `;
+        });
+
+        // Responsive chart
+        function resize() {
+            width = container.clientWidth - margin.left - margin.right;
+            height = container.clientHeight - margin.top - margin.bottom;
+
+            // Update SVG viewBox
+            d3.select(container.querySelector('svg'))
+                .attr('viewBox', `0 0 ${container.clientWidth} ${container.clientHeight}`);
+
+            // Update scales
+            xScale.range([0, width]);
+            yScale.range([height, 0]);
+
+            // Update background
+            svg.select(".plot-bg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // Update axes
+            svg.select(".axis:nth-of-type(1)").call(xAxis);
+            svg.select(".axis:nth-of-type(2)").call(yAxis);
+            svg.select("g:nth-of-type(3)").attr("transform", `translate(0, ${height})`).call(xAxis);
+            svg.select("g:nth-of-type(4)").call(yAxis);
+
+            // Update axis labels
+            svg.select("text:nth-of-type(1)").attr("x", width / 2 + margin.left / 2).attr("y", height + margin.top);
+            svg.select("text:nth-of-type(2)").attr("y", -margin.left + 20).attr("x", -height / 2 + margin.top);
+
+
+            // Update dots
+            dots.attr("cx", d => xScale(d.x))
+                .attr("cy", d => yScale(d.y));
+        }
+
+        window.addEventListener('resize', resize);
+
+    </script>
+</body>
+</html>
+    
